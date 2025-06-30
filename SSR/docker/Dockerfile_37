@@ -1,0 +1,51 @@
+ARG PYTORCH="1.9.1"
+ARG CUDA="11.1"
+ARG CUDNN="8"
+
+FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
+
+SHELL ["bash","-lc"]
+
+ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0 8.0 8.6+PTX" \
+    TORCH_NVCC_FLAGS="-Xfatbin -compress-all" \
+    CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
+
+# fetch and install NVIDIA public keys so CUDA repo is trusted
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub \
+    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub
+
+# update package lists and install system libraries
+RUN apt-get update && apt-get install -y \
+        ffmpeg libsm6 libxext6 libglib2.0-0 libxrender-dev git ninja-build \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# make sure pip tooling is up to date
+RUN pip install --upgrade pip setuptools wheel
+
+# install core OpenMMLab packages
+RUN pip install \
+        mmcv-full==1.4.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html \
+        mmdet==2.14.0 \
+        mmsegmentation==0.14.1
+
+RUN mkdir -p /Development/
+WORKDIR /Development/
+# clone and prepare MMDetection3D
+RUN git clone https://github.com/open-mmlab/mmdetection3d.git \
+    && cd mmdetection3d \
+    && git checkout -f v0.17.1
+
+ENV FORCE_CUDA="1"
+WORKDIR /Development/mmdetection3d
+
+# build the package in editable mode
+RUN pip install -r requirements/build.txt \
+    && pip install --no-cache-dir -e .
+
+RUN pip install timm=0.6.12
+WORKDIR /Development
+RUN git clone https://github.com/PeidongLi/SSR.git
+
+
+CMD ["bash"]
