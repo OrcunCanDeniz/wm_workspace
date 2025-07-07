@@ -16,8 +16,8 @@ PROJECTS_LIST=("SSR")
 #   A string of volume mount options for Docker
 populate_volumes() {
     local project_name="$1"
-    local data_path="$HOME_DIR/$project_name/data"
-    local code_path="$HOME_DIR/$project_name"
+    local data_path="$HOME_DIR/wm_workspace/$project_name/data"
+    local code_path="$HOME_DIR/wm_workspace/$project_name"
     local docker_code_path="/workspace/$project_name"
     local volumes=""
 
