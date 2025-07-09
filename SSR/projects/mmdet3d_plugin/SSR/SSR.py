@@ -58,6 +58,7 @@ class SSR(MVXTwoStageDetector):
                  fut_ts=6,
                  fut_mode=6,
                  loss_bev=None,
+                 ensemble_size=5,
                  retrain_lwm_ensemble=True
                  ):
 
@@ -88,11 +89,12 @@ class SSR(MVXTwoStageDetector):
         self.embed_dims = 256
         self.latent_world_model = latent_world_model
         self.tokenfuser = TokenFuser(16, 256)
+        self.ensemble_size = ensemble_size
 
         if self.latent_world_model is not None:
             ens_lwm = []
             ens_tokenfuser = []
-            for ens_idx in range(self.latent_world_model['ensemble_size']):
+            for ens_idx in range(self.ensemble_size):
                 ens_lwm.append(build_transformer_layer_sequence(self.latent_world_model))
                 ens_tokenfuser.append(TokenFuser(16, 256))
                 

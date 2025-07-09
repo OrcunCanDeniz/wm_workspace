@@ -213,8 +213,8 @@ model = dict(
         loss_plan_bound=dict(type='PlanMapBoundLoss', loss_weight=1.0, dis_thresh=1.0),
         loss_plan_col=dict(type='PlanCollisionLoss', loss_weight=1.0),
         loss_plan_dir=dict(type='PlanMapDirectionLoss', loss_weight=0.5)),
+    ensemble_size=5,
     latent_world_model=dict(
-            ensemble_size=5,
             type='CustomTransformerDecoder',
             num_layers=2,
             return_intermediate=False,
