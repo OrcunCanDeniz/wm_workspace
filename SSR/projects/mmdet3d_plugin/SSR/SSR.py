@@ -58,7 +58,7 @@ class SSR(MVXTwoStageDetector):
                  fut_ts=6,
                  fut_mode=6,
                  loss_bev=None,
-                 freeze_pre_latent=False
+                 retrain_lwm_ensemble=True
                  ):
 
         super(SSR,
@@ -90,26 +90,53 @@ class SSR(MVXTwoStageDetector):
         self.tokenfuser = TokenFuser(16, 256)
 
         if self.latent_world_model is not None:
-            self.latent_world_model = build_transformer_layer_sequence(self.latent_world_model)
-            for p in self.latent_world_model.parameters():
-                if p.dim() > 1:
-                    torch.nn.init.xavier_uniform_(p)
+            ens_lwm = []
+            ens_tokenfuser = []
+            for ens_idx in range(self.latent_world_model['ensemble_size']):
+                ens_lwm.append(build_transformer_layer_sequence(self.latent_world_model))
+                ens_tokenfuser.append(TokenFuser(16, 256))
+                
+                for p in ens_lwm[-1].parameters():
+                    if p.dim() > 1:
+                        torch.nn.init.xavier_uniform_(p)
+                        
+            self.latent_world_model = nn.ModuleList(ens_lwm)
+            self.tokenfuser = nn.ModuleList(ens_tokenfuser)
             self.loss_bev = build_loss(loss_bev)
 
-        if freeze_pre_latent:
-            self.freeze_pre_latent_parameters()
+        if retrain_lwm_ensemble:
+            self.freeze_except_lwm()
 
-    def freeze_pre_latent_parameters(self):
-        # Freeze img_backbone
-        for param in self.img_backbone.parameters():
-            param.requires_grad = False
-        # Freeze img_neck if present
-        if hasattr(self, 'img_neck') and self.img_neck is not None:
-            for param in self.img_neck.parameters():
-                param.requires_grad = False
-        # Freeze pts_bbox_head (SSRHead)
-        for param in self.pts_bbox_head.parameters():
-            param.requires_grad = False
+    def freeze_except_lwm(self):
+        """
+        Freeze all model parameters except those in latent_world_model.
+        
+        Args:
+            model: The SSR model instance
+        """
+        
+        # First freeze all parameters
+        for param in self.parameters():
+            param.requires_grad = False 
+        
+        # Then unfreeze latent_world_model parameters if it exists
+        for model in self.latent_world_model:
+            for param in model.parameters():
+                param.requires_grad = True
+                
+        for model in self.tokenfuser:
+            for param in model.parameters():
+                param.requires_grad = True
+        
+        # Count trainable parameters
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in self.parameters())
+        
+        print(f"Total parameters: {total_params}")
+        print(f"Trainable parameters: {trainable_params}")
+        print(f"Frozen parameters: {total_params - trainable_params}")
+        print(f"Percentage trainable: {100 * trainable_params / total_params:.2f}%")
+
 
     def extract_img_feat(self, img, img_metas, len_queue=None):
         """Extract features of images."""
@@ -200,15 +227,19 @@ class SSR(MVXTwoStageDetector):
             # act_pos = outs['act_pos']
             bev_embed = outs['bev_embed']
 
-            pred_latent = self.latent_world_model(
-                    query=act_query,
-                    key=act_query,
-                    value=act_query)
+            ens_losses = []
+            for lwm, tokenfuser in zip(self.latent_world_model, self.tokenfuser):
+                pred_latent = lwm(
+                        query=act_query,
+                        key=act_query,
+                        value=act_query)
             
-            pred_bev = self.tokenfuser(pred_latent.permute(1, 0, 2), bev_embed)
+                pred_bev = tokenfuser(pred_latent.permute(1, 0, 2), bev_embed)
 
-            loss_bev = self.loss_bev(pred_bev, next_bev.detach())
-            losses.update(loss_bev=loss_bev)
+                loss_bev = self.loss_bev(pred_bev, next_bev.detach())
+                ens_losses.append(loss_bev)
+            
+            losses.update(loss_bev=sum(ens_losses))
 
         return losses
 

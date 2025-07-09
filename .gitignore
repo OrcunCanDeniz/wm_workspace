@@ -7,3 +7,4 @@
 **/.env.production.local
 **/*.pyc
 **/*.pth
+/exploration-by-disagreement/

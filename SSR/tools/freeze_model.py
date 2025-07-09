@@ -36,6 +36,11 @@ def parse_args():
         action='store_true',
         help='whether to set deterministic options for CUDNN backend.')
     parser.add_argument(
+        '--freeze-except-latent',
+        action='store_true',
+        default=True,
+        help='freeze all layers except latent_world_model for fine-tuning')
+    parser.add_argument(
         '--cfg-options',
         nargs='+',
         action=DictAction,
@@ -51,7 +56,7 @@ def parse_args():
         os.environ['LOCAL_RANK'] = str(args.local_rank)
     return args
 
-def build_model_from_config(config_path, checkpoint_path, fuse_conv_bn=False, cfg_options=None, seed=0, deterministic=False):
+def build_model_from_config(config_path, checkpoint_path, fuse_conv_bn=False, cfg_options=None, seed=0, deterministic=False, freeze_except_latent=False):
     """
     Build model from config and checkpoint without dataset and optimization components.
     
@@ -62,6 +67,7 @@ def build_model_from_config(config_path, checkpoint_path, fuse_conv_bn=False, cf
         cfg_options (dict): Additional config options to override
         seed (int): Random seed
         deterministic (bool): Whether to set deterministic options for CUDNN
+        freeze_except_latent (bool): Whether to freeze all layers except latent_world_model
     
     Returns:
         model: Built and loaded model
@@ -133,6 +139,7 @@ def build_model_from_config(config_path, checkpoint_path, fuse_conv_bn=False, cf
     if 'PALETTE' in checkpoint.get('meta', {}):
         model.PALETTE = checkpoint['meta']['PALETTE']
     
+    
     print(f"Model built successfully from {config_path}")
     print(f"Checkpoint loaded from {checkpoint_path}")
     print(f"Model has {sum(p.numel() for p in model.parameters())} parameters")
@@ -150,7 +157,7 @@ def main():
         fuse_conv_bn=args.fuse_conv_bn,
         cfg_options=args.cfg_options,
         seed=args.seed,
-        deterministic=args.deterministic
+        deterministic=args.deterministic,
     )
     
     print("Model building completed successfully!")
