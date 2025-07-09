@@ -1,0 +1,3 @@
+intentionally left this to keep /data dir.
+
+put soft link to nuscenes data dir here

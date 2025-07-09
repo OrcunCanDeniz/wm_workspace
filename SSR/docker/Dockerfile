@@ -35,6 +35,7 @@ RUN git clone https://github.com/open-mmlab/mmdetection3d.git \
   && python3 -m pip install .
 
 # Install additional tools
+RUN python3 -m pip install yapf==0.40.1
 RUN python3 -m pip install nuscenes-devkit==1.1.9
 
 # Set up your workspace mount point
