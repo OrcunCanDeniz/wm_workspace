@@ -14,7 +14,7 @@ import time
 import torch
 import warnings
 from mmcv import Config, DictAction
-from mmcv.runner import get_dist_info, init_dist
+from mmcv.runner import get_dist_info, init_dist, load_checkpoint
 from os import path as osp
 
 from mmdet import __version__ as mmdet_version
@@ -90,6 +90,7 @@ def parse_args():
         '--autoscale-lr',
         action='store_true',
         help='automatically scale lr with the number of gpus')
+    parser.add_argument('--tune_from', type=str)
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -224,6 +225,9 @@ def main():
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
+    
+    if args.tune_from is not None:
+        checkpoint = load_checkpoint(model, args.checkpoint, map_location='cpu')
 
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]

@@ -5,7 +5,7 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=$CUDA_HOME/bin:$PATH  
 ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH  
 ENV FORCE_CUDA=1
-ENV TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;8.0;8.6+PTX"
+ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
 
 RUN apt-get update && apt-get install -y \
     python3.8 python3.8-dev python3-pip python3-setuptools \

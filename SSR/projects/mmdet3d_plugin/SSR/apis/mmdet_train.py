@@ -27,7 +27,8 @@ def custom_train_detector(model,
                    validate=False,
                    timestamp=None,
                    eval_model=None,
-                   meta=None):
+                   meta=None,
+                   finetune=False):
     logger = get_root_logger(cfg.log_level)
 
     # prepare data loaders
@@ -88,6 +89,10 @@ def custom_train_detector(model,
 
     # build runner
     optimizer = build_optimizer(model, cfg.optimizer)
+    
+    if finetune:
+        for group in optimizer.param_groups:
+            group['params'] = [p for p in group['params'] if p.requires_grad]
 
     if 'runner' not in cfg:
         cfg.runner = {

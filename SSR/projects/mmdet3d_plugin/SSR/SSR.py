@@ -130,6 +130,15 @@ class SSR(MVXTwoStageDetector):
             for param in model.parameters():
                 param.requires_grad = True
         
+        # Freeze batch norm layers by setting them to eval mode
+        def set_bn_eval(module):
+            if isinstance(module, (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)):
+                module.eval()
+                # Freeze running stats
+                module.track_running_stats = False
+        
+        self.apply(set_bn_eval)
+        
         # Count trainable parameters
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in self.parameters())
