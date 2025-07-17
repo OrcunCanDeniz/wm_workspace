@@ -227,7 +227,7 @@ def main():
     model.init_weights()
     
     if args.tune_from is not None:
-        checkpoint = load_checkpoint(model, args.checkpoint, map_location='cpu')
+        checkpoint = load_checkpoint(model, args.tune_from, map_location='cpu')
 
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]
