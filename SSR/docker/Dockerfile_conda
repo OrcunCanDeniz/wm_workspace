@@ -1,0 +1,77 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_HOME=/opt/conda/envs/py38
+ENV CUDA_PATH=$CUDA_HOME
+ENV PATH=$CUDA_HOME/bin:$PATH
+ENV LD_LIBRARY_PATH=""
+ENV LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+ENV FORCE_CUDA=1
+ENV TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
+
+# Install core system packages
+RUN apt-get update && apt-get install -y \
+    wget bzip2 ca-certificates \
+    python3.8 python3.8-dev python3-pip python3-setuptools \
+    git build-essential libgl1 libglib2.0-0 libsm6 libxext6 \
+    ninja-build \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install Miniconda
+ENV CONDA_DIR=/opt/conda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/conda.sh \
+  && mkdir -p $CONDA_DIR \
+  && bash /tmp/conda.sh -b -f -p $CONDA_DIR \
+  && rm /tmp/conda.sh \
+  && $CONDA_DIR/bin/conda clean -afy \
+  && ln -s $CONDA_DIR/etc/profile.d/conda.sh /etc/profile.d/conda.sh
+
+# Use bash login shell so conda is initialized
+SHELL ["bash", "-lc"]
+
+# Update conda and create Python 3.8 environment
+RUN conda tos accept && \
+    conda config --set ssl_verify false && \
+    conda update -n base -c defaults conda \
+      && conda create -y -n py38 python=3.8 \
+      && conda clean -afy
+
+# TODO: set ld path from conda_prefix
+
+RUN conda init 
+
+# Inside py38: upgrade pip and install PyTorch+CUDA
+RUN conda activate py38 && \
+    python3 -m pip install --upgrade pip setuptools wheel && \
+    conda config --set ssl_verify false && \
+    conda install -y cudatoolkit-dev=11.3 -c conda-forge 
+
+RUN conda activate py38 && \
+    python3 -m pip install  torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
+
+RUN conda activate py38 && \
+    conda install -y -c conda-forge gcc_linux-64=10 gxx_linux-64=10 libxcrypt
+
+RUN conda activate py38 && \
+    python3 -m pip install \
+      mmcv-full==1.4.0 \
+        -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.1/index.html 
+
+RUN conda activate py38 && \
+    python3 -m pip install \
+      mmdet==2.14.0 \
+      mmsegmentation==0.14.1 \
+      timm
+
+WORKDIR /opt
+RUN git clone https://github.com/open-mmlab/mmdetection3d.git && \
+    cd mmdetection3d && \
+    git checkout v0.17.1 && \
+    conda activate py38 && \
+    python -m pip install .
+
+# Set default working directory
+WORKDIR /workspace
+
+# Launch with the conda env activated
+CMD ["bash", "-lc", "conda activate py38 && bash"]
