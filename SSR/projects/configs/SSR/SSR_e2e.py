@@ -383,4 +383,12 @@ custom_hooks = [
         init_updates=10560,
         priority='NORMAL',
     ),
+     dict(
+            type="WandbLoggerHook",
+            init_kwargs={
+                "project": "SSR-Fintune",
+                # "entity": "orcun-c-deniz",
+            },
+            interval=50
+        ),
 ]
