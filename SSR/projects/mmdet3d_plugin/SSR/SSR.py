@@ -59,7 +59,6 @@ class SSR(MVXTwoStageDetector):
                  fut_mode=6,
                  loss_bev=None,
                  ensemble_size=5,
-                 retrain_lwm_ensemble=True
                  ):
 
         super(SSR,
@@ -106,8 +105,6 @@ class SSR(MVXTwoStageDetector):
             self.tokenfuser = nn.ModuleList(ens_tokenfuser)
             self.loss_bev = build_loss(loss_bev)
 
-        if retrain_lwm_ensemble:
-            self.freeze_except_lwm()
 
     def freeze_except_lwm(self):
         """
