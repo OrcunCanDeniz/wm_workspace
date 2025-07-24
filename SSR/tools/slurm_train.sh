@@ -4,9 +4,9 @@
 #SBATCH --nodes=1                          # 1 node
 #SBATCH --ntasks-per-node=1                # one srun task per node
 #SBATCH --gres=gpu:rtx3080:8               # 8 GPUs on that node
-#SBATCH --cpus-per-task=8                  # CPUs for data loading, etc.
+#SBATCH --cpus-per-task=32                  # CPUs for data loading, etc.
 #SBATCH --time=24:00:00                    # hh:mm:ss walltime
-#SBATCH --partition=rtx3080,work           # GPU partition
+#SBATCH --partition=rtx3080,work                 # GPU partition
 # (no --output/--error here—handled by srun instead)
 
 # Paths (adjust to your environment)
@@ -35,24 +35,26 @@ export http_proxy="http://proxy.nhr.fau.de:80"
 export https_proxy="http://proxy.nhr.fau.de:80"
 
 # Launch training, capturing stdout/err into node-local files
-srun \
-  --output="${SLURM_LOGS_DIR}/${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" \
-  --error ="${SLURM_LOGS_DIR}/${SLURM_JOB_NAME}_${SLURM_JOB_ID}.err" \
+# srun \
+#   --output="${SLURM_LOGS_DIR}/${SLURM_JOB_NAME}_${SLURM_JOB_ID}.out" \
+#   --error ="${SLURM_LOGS_DIR}/${SLURM_JOB_NAME}_${SLURM_JOB_ID}.err" \
   apptainer exec --nv \
     --bind "${BIND_LIST}" \
     --env WANDB_API_KEY="${WANDB_API_KEY}" \
     --env http_proxy="${http_proxy}" \
     --env https_proxy="${https_proxy}" \
     "${SIF_IMAGE}" \
-    bash -lc "\
+    bash -lc '
       python -m torch.distributed.run \
-        --nproc_per_node=\$SLURM_GPUS_ON_NODE \
-        --master_port=\$((20000 + SLURM_JOB_ID % 10000)) \
-        tools/train.py projects/configs/${PROJECT}/${PROJECT}_e2e.py \
-        --tune_from ${CODE_DIR}/ssr.pth \
+        --nproc_per_node=${SLURM_GPUS_ON_NODE} \
+        --master_port=$((20000 + SLURM_JOB_ID % 10000)) \
+        tools/train.py projects/configs/'"${PROJECT}"'/'"${PROJECT}"'_e2e.py \
+        --tune_from '"${CODE_DIR}"'/ssr.pth \
         --launcher pytorch \
         --deterministic \
-        --work-dir ${NODE_LOCAL_ARTEFACTS_DIR}"
+        --cfg-options dist_params.backend=gloo \
+        --work-dir '"${CODE_DIR}"'/work_dirs
+    '
 
 # Stage back your model outputs
 cp -r "${NODE_LOCAL_ARTEFACTS_DIR}" "${LOCAL_ARTEFACTS_DIR}/"
