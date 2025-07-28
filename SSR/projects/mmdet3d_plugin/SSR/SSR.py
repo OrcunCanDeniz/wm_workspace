@@ -31,6 +31,7 @@ from projects.mmdet3d_plugin.SSR.planner.metric_stp3 import PlanningMetric
 from .tokenlearner import TokenFuser
 import torch.nn.functional as F
 import torch.nn as nn
+import pdb
 
 
 @DETECTORS.register_module()
@@ -59,7 +60,8 @@ class SSR(MVXTwoStageDetector):
                  fut_mode=6,
                  loss_bev=None,
                  ensemble_size=5,
-                 retrain_lwm_ensemble=True
+                 retrain_lwm_ensemble=True,
+                 compute_disagreement=False,
                  ):
 
         super(SSR,
@@ -105,6 +107,7 @@ class SSR(MVXTwoStageDetector):
             self.latent_world_model = nn.ModuleList(ens_lwm)
             self.tokenfuser = nn.ModuleList(ens_tokenfuser)
             self.loss_bev = build_loss(loss_bev)
+        self.compute_disagreement = compute_disagreement
 
         if retrain_lwm_ensemble:
             self.freeze_except_lwm()
@@ -447,6 +450,7 @@ class SSR(MVXTwoStageDetector):
         self.prev_frame_info['prev_bev'] = new_prev_bev
         self.prev_frame_info['prev_angle'] = tmp_angle
 
+        # bbox_results is actually the disagreement score if self.compute_disagreement==True
         return bbox_results
 
     def simple_test(
@@ -471,6 +475,7 @@ class SSR(MVXTwoStageDetector):
         """Test function without augmentaiton."""
         img_feats = self.extract_feat(img=img, img_metas=img_metas)
         bbox_list = [dict() for i in range(len(img_metas))]
+        # bbox_pts is actually the disagreement score if compute_disagreement==True
         new_prev_bev, bbox_pts, metric_dict = self.simple_test_pts(
             img_feats,
             img_metas,
@@ -488,11 +493,41 @@ class SSR(MVXTwoStageDetector):
             ego_lcf_feat=ego_lcf_feat,
             gt_attr_labels=gt_attr_labels,
         )
+        
+        if self.compute_disagreement:
+            return new_prev_bev, [bbox_pts] 
+            
+        
         for result_dict, pts_bbox in zip(bbox_list, bbox_pts):
             result_dict['pts_bbox'] = pts_bbox
             result_dict['metric_results'] = metric_dict
 
         return new_prev_bev, bbox_list
+    
+    def get_disagreement(self,
+                           act_query,
+                           bev_embed):
+        """Each lwm predicts next latent and then feature wise variance is utilized to infer
+        disagreement.
+        """
+       
+        with torch.no_grad():
+            lwm_preds = []
+            if self.latent_world_model is not None:
+
+                for lwm, tokenfuser in zip(self.latent_world_model, self.tokenfuser):
+                    pred_latent = lwm(
+                            query=act_query,
+                            key=act_query,
+                            value=act_query)
+                
+                    pred_bev = tokenfuser(pred_latent.permute(1, 0, 2), bev_embed)
+                    lwm_preds.append(pred_bev.reshape(-1))  # [H,W,C] -> [H*W*C] = [F]
+            lwm_preds_t = torch.cat(lwm_preds) # [B, F]
+            ft_wise_var = torch.var(lwm_preds_t, 0) # [F]
+            disagreement_score = torch.mean(ft_wise_var, -1) # [1] 
+            
+        return disagreement_score
 
     def simple_test_pts(
         self,
@@ -521,6 +556,17 @@ class SSR(MVXTwoStageDetector):
 
         outs = self.pts_bbox_head(x, img_metas, prev_bev=prev_bev, cmd=ego_fut_cmd,
                                   ego_his_trajs=ego_his_trajs, ego_lcf_feat=ego_lcf_feat)
+
+        if self.compute_disagreement:
+            disagreement_score = self.get_disagreement(outs["act_query"], outs["bev_embed"])
+            # "sample_idx" key below was assumed to be the sample token of nusc dataset, there's also 
+            #   a "scene_token" key in img_metas in case we need it.
+            curation_info = { 
+                                "scene_token" : img_metas[0]["scene_token"],
+                                "sample_token" : img_metas[0]["sample_idx"],
+                                "score" : disagreement_score
+                            }
+            return outs['bev_embed'], curation_info, None
 
         bbox_results = []
         for i in range(len(outs['ego_fut_preds'])):

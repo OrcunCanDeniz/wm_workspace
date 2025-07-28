@@ -375,7 +375,7 @@ log_config = dict(
 # fp16 = dict(loss_scale=512.)
 find_unused_parameters = True
 checkpoint_config = dict(interval=1, max_keep_ckpts=total_epochs)
-
+wandb_project_name = "SSR-Finetune"
 custom_hooks = [
     dict(type='CustomSetEpochInfoHook'),
     dict(
@@ -386,9 +386,15 @@ custom_hooks = [
      dict(
             type="WandbLoggerHook",
             init_kwargs={
-                "project": "SSR-Fintune",
+                "project": wandb_project_name,
                 # "entity": "orcun-c-deniz",
             },
             interval=50
-        ),
+    ),
+     dict( 
+            type="WandbArtifactHook",
+            wandb_entity="pnp_dnp",
+            wandb_project = wandb_project_name,
+            priority='LOWEST',
+    )
 ]

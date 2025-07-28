@@ -30,6 +30,7 @@ from mmdet.datasets import replace_ImageToTensor
 import time
 import os.path as osp
 import json
+import pdb
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -103,6 +104,7 @@ def parse_args():
         default='none',
         help='job launcher')
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--compute-disagreement', action='store_true', default=False)
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -197,6 +199,12 @@ def main():
     # set random seeds
     if args.seed is not None:
         set_random_seed(args.seed, deterministic=args.deterministic)
+
+    if args.compute_disagreement:
+        cfg.model.compute_disagreement = True        
+        # we want novelty scores(disagreement) of train split, remap runner's target data split to train
+        cfg.data.val.ann_file = cfg.data.train.ann_file
+        cfg.data.test.ann_file = cfg.data.train.ann_file
 
     # build the dataloader
     dataset = build_dataset(cfg.data.test)
