@@ -90,7 +90,7 @@ def parse_args():
         '--autoscale-lr',
         action='store_true',
         help='automatically scale lr with the number of gpus')
-    parser.add_argument('--tune_from', type=str)
+    parser.add_argument('--tune_from', default="./ssr.pth", type=str)
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -228,6 +228,7 @@ def main():
     
     if args.tune_from is not None:
         checkpoint = load_checkpoint(model, args.tune_from, map_location='cpu')
+        model.freeze_except_lwm()
 
     logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]

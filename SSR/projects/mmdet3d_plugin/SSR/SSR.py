@@ -60,7 +60,6 @@ class SSR(MVXTwoStageDetector):
                  fut_mode=6,
                  loss_bev=None,
                  ensemble_size=5,
-                 retrain_lwm_ensemble=True,
                  compute_disagreement=False,
                  ):
 
@@ -109,8 +108,6 @@ class SSR(MVXTwoStageDetector):
             self.loss_bev = build_loss(loss_bev)
         self.compute_disagreement = compute_disagreement
 
-        if retrain_lwm_ensemble:
-            self.freeze_except_lwm()
 
     def freeze_except_lwm(self):
         """
