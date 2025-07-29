@@ -46,7 +46,7 @@ populate_volumes() {
 }
 
 TAG="latest"
-IMAGE_NAME="${PROJECT_NAME,,}:${TAG,,}"
+IMAGE_NAME="orcund/${PROJECT_NAME,,}:${TAG,,}"
 CONTAINER_NAME="${PROJECT_NAME,,}"
 
 
@@ -66,6 +66,13 @@ VOLUMES_CLEAN=$(echo "$VOLUMES" | tr -s ' ' | sed 's/^ //;s/ $//')
 echo "Mounting the following directories to the Docker container:"
 echo "$VOLUMES_CLEAN" | tr ' ' '\n'
 
+# Check if WANDB_API_KEY is set and not empty
+if [ -z "${WANDB_API_KEY:-}" ]; then
+    read -rp "Enter your WANDB API key: " WANDB_API_KEY
+fi
+
+# Add it to the Docker env string
+WANDB_ENV="--env WANDB_API_KEY=${WANDB_API_KEY}"
 
 VISUAL="--env=DISPLAY \
         --env=QT_X11_NO_MITSHM=1 \
@@ -77,6 +84,7 @@ docker run -d -it --rm \
     -p 8888:8888 \
     $VOLUMES \
     $VISUAL \
+    $WANDB_ENV \
     --env NVIDIA_DISABLE_REQUIRE=1 \
     --gpus all \
     --privileged \
