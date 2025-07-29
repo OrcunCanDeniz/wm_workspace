@@ -9,3 +9,7 @@
 **/*.pth
 **/exploration-by-disagreement/
 **/wandb/
+**/work_dirs/
+**/tf_logs/
+*.o* 
+# ^ slurm logs
