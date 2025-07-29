@@ -13,3 +13,5 @@
 **/tf_logs/
 *.o* 
 # ^ slurm logs
+SSR/data/nuscenes
+**/.ipynb_checkpoints
